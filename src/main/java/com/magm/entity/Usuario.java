@@ -36,11 +36,16 @@ public class Usuario implements UserDetails {
     @JoinColumn(name = "id_cliente", nullable = false)
     private Cliente cliente;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "id_rol")
+    private Rol rolEntity;
+
     // ─── UserDetails ──────────────────────────────────────
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + rol));
+        String nombreRol = (rolEntity != null) ? rolEntity.getNombre() : rol;
+        return List.of(new SimpleGrantedAuthority("ROLE_" + nombreRol));
     }
 
     @Override

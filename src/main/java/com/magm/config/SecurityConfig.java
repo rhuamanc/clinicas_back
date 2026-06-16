@@ -32,7 +32,13 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
-                .anyRequest().authenticated()
+                .requestMatchers("/api/roles/**").authenticated()
+                .requestMatchers("/api/usuarios/**").authenticated()
+                .requestMatchers("/api/productos/**").authenticated()
+                .requestMatchers("/api/compras/**").authenticated()
+                .requestMatchers("/api/ventas/**").authenticated()
+                .requestMatchers("/api/**").authenticated()
+                .anyRequest().permitAll()
             )
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)

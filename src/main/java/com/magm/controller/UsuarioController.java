@@ -2,9 +2,11 @@ package com.magm.controller;
 
 import com.magm.dto.UsuarioAdminDTO;
 import com.magm.entity.Cliente;
+import com.magm.entity.Rol;
 import com.magm.entity.Usuario;
 import com.magm.entity.Zona;
 import com.magm.repository.ClienteRepository;
+import com.magm.repository.RolRepository;
 import com.magm.repository.UsuarioRepository;
 import com.magm.repository.ZonaRepository;
 import jakarta.validation.Valid;
@@ -25,6 +27,7 @@ public class UsuarioController {
     private final UsuarioRepository usuarioRepository;
     private final ClienteRepository clienteRepository;
     private final ZonaRepository zonaRepository;
+    private final RolRepository rolRepository;
     private final PasswordEncoder passwordEncoder;
 
     @GetMapping
@@ -53,6 +56,14 @@ public class UsuarioController {
         usuario.setAdmin("ADMIN".equalsIgnoreCase(usuario.getRol()));
         usuario.setCliente(cliente);
 
+        // Asignar rol si se proporciona idRol
+        if (dto.getIdRol() != null) {
+            Rol rol = rolRepository.findById(dto.getIdRol())
+                    .orElseThrow(() -> new RuntimeException("Rol no encontrado"));
+            usuario.setRolEntity(rol);
+            usuario.setRol(rol.getNombre());
+        }
+
         return ResponseEntity.status(HttpStatus.CREATED).body(toDTO(usuarioRepository.save(usuario)));
     }
 
@@ -67,7 +78,13 @@ public class UsuarioController {
         if (dto.getPassword() != null && !dto.getPassword().isBlank()) {
             usuario.setPassword(passwordEncoder.encode(dto.getPassword()));
         }
-        if (dto.getRol() != null && !dto.getRol().isBlank()) {
+        if (dto.getIdRol() != null) {
+            Rol rol = rolRepository.findById(dto.getIdRol())
+                    .orElseThrow(() -> new RuntimeException("Rol no encontrado"));
+            usuario.setRolEntity(rol);
+            usuario.setRol(rol.getNombre());
+            usuario.setAdmin("ADMIN".equalsIgnoreCase(rol.getNombre()));
+        } else if (dto.getRol() != null && !dto.getRol().isBlank()) {
             usuario.setRol(dto.getRol());
             usuario.setAdmin("ADMIN".equalsIgnoreCase(dto.getRol()));
         }
@@ -99,6 +116,9 @@ public class UsuarioController {
         dto.setId(u.getId());
         dto.setNombre(u.getNombre());
         dto.setRol(u.getRol());
+        if (u.getRolEntity() != null) {
+            dto.setIdRol(u.getRolEntity().getIdRol());
+        }
         dto.setEstado(u.getEstado());
         dto.setIdCliente(u.getCliente() != null ? u.getCliente().getIdCliente() : null);
         dto.setIdZona(u.getCliente() != null && u.getCliente().getZona() != null ? u.getCliente().getZona().getIdZona() : null);

@@ -14,6 +14,7 @@ public class UsuarioAdminDTO {
 
     @NotBlank(message = "El rol es obligatorio")
     private String rol;
+    private Integer idRol;
     private Integer estado;
 
     @NotNull(message = "La zona es obligatoria")

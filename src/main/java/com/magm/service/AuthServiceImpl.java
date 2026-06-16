@@ -10,7 +10,9 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -46,6 +48,35 @@ public class AuthServiceImpl implements AuthService {
                 token,
                 usuario.getNombre(),
                 usuario.getRol(),
-                usuario.getCliente().getZona().getIdZona());
+                usuario.getCliente().getZona().getIdZona(),
+                resolverRecursos(usuario));
+    }
+
+    private List<String> resolverRecursos(Usuario usuario) {
+        if (usuario.getRolEntity() != null && usuario.getRolEntity().getRecursos() != null) {
+            return new ArrayList<>(usuario.getRolEntity().getRecursos());
+        }
+
+        if ("ADMIN".equalsIgnoreCase(usuario.getRol())) {
+            return List.of(
+                    "laboratorios",
+                    "genericos",
+                    "productos",
+                    "proveedores",
+                    "ventas",
+                    "compras",
+                    "salidas",
+                    "incentivos",
+                    "usuarios",
+                    "roles",
+                    "digemid_codigos",
+                    "cargos",
+                    "reportes",
+                    "pedidos",
+                    "caja"
+            );
+        }
+
+        return List.of();
     }
 }

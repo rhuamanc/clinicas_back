@@ -3,6 +3,8 @@ package com.magm.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @AllArgsConstructor
 public class LoginResponse {
@@ -10,4 +12,5 @@ public class LoginResponse {
     private String nombre;
     private String rol;
     private Integer idZona;
+    private List<String> recursos;
 }
