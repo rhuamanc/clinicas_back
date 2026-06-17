@@ -73,7 +73,21 @@ public class AuthServiceImpl implements AuthService {
                     "cargos",
                     "reportes",
                     "pedidos",
-                    "caja"
+                    "caja",
+                    "pacientes",
+                    "medicos",
+                    "especialidades",
+                    "citas",
+                    "admision",
+                    "triaje",
+                    "consulta_medica",
+                    "diagnosticos",
+                    "recetas_medicas",
+                    "farmacia_integrada",
+                    "laboratorio_clinico",
+                    "procedimientos",
+                    "historia_clinica",
+                    "configuracion"
             );
         }
 

@@ -7,6 +7,7 @@ import com.magm.entity.Proveedor;
 import com.magm.entity.Rol;
 import com.magm.entity.Usuario;
 import com.magm.entity.Zona;
+import com.magm.entity.clinica.Especialidad;
 import com.magm.repository.ClienteRepository;
 import com.magm.repository.LaboratorioRepository;
 import com.magm.repository.ProductoRepository;
@@ -14,6 +15,7 @@ import com.magm.repository.ProveedorRepository;
 import com.magm.repository.RolRepository;
 import com.magm.repository.UsuarioRepository;
 import com.magm.repository.ZonaRepository;
+import com.magm.repository.clinica.EspecialidadRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
@@ -43,7 +45,21 @@ public class DataInitializer {
             "cargos",
             "reportes",
             "pedidos",
-            "caja"
+            "caja",
+            "pacientes",
+            "medicos",
+            "especialidades",
+            "citas",
+            "admision",
+            "triaje",
+            "consulta_medica",
+            "diagnosticos",
+            "recetas_medicas",
+            "farmacia_integrada",
+            "laboratorio_clinico",
+            "procedimientos",
+            "historia_clinica",
+            "configuracion"
     );
 
     private final UsuarioRepository usuarioRepository;
@@ -53,6 +69,7 @@ public class DataInitializer {
     private final LaboratorioRepository laboratorioRepository;
     private final ProveedorRepository proveedorRepository;
     private final RolRepository rolRepository;
+    private final EspecialidadRepository especialidadRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Bean
@@ -78,6 +95,41 @@ public class DataInitializer {
                     "genericos",
                     "proveedores"
             ));
+            upsertRol("MEDICO", "Medico del policlinico", List.of(
+                    "pacientes",
+                    "medicos",
+                    "especialidades",
+                    "citas",
+                    "admision",
+                    "triaje",
+                    "consulta_medica",
+                    "diagnosticos",
+                    "recetas_medicas",
+                    "laboratorio_clinico",
+                    "procedimientos",
+                    "historia_clinica"
+            ));
+            upsertRol("ADMISION", "Admision del policlinico", List.of(
+                    "pacientes",
+                    "citas",
+                    "admision",
+                    "triaje",
+                    "historia_clinica"
+            ));
+            upsertRol("LABORATORIO", "Laboratorio clinico", List.of(
+                    "pacientes",
+                    "laboratorio_clinico",
+                    "historia_clinica"
+            ));
+            upsertRol("FARMACIA", "Farmacia integrada", List.of(
+                    "productos",
+                    "ventas",
+                    "recetas_medicas",
+                    "farmacia_integrada",
+                    "historia_clinica"
+            ));
+
+            asegurarEspecialidadesBase();
 
             Zona zonaPrincipal = asegurarZonaPrincipal();
             asegurarUsuarioPrivilegiado("superadmin", "superadmin123", "Super Administrador", zonaPrincipal, rolAdmin);
@@ -165,6 +217,29 @@ public class DataInitializer {
         rol.setEstado(1);
         rol.setRecursos(recursos);
         return rolRepository.save(rol);
+    }
+
+    private void asegurarEspecialidadesBase() {
+        if (especialidadRepository.count() > 0) {
+            return;
+        }
+
+        List<String> especialidades = List.of(
+                "Medicina General",
+                "Pediatria",
+                "Ginecologia",
+                "Odontologia",
+                "Nutricion",
+                "Dermatologia"
+        );
+
+        for (String nombre : especialidades) {
+            especialidadRepository.save(Especialidad.builder()
+                    .nombre(nombre)
+                    .descripcion("Especialidad medica: " + nombre)
+                    .activa(true)
+                    .build());
+        }
     }
 
     private Zona asegurarZonaPrincipal() {
