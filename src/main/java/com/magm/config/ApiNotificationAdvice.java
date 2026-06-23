@@ -110,6 +110,11 @@ public class ApiNotificationAdvice implements ResponseBodyAdvice<Object> {
             if (HttpMethod.DELETE.equals(method)) return "Laboratorio eliminado correctamente";
         }
 
+        if (path.startsWith("/api/clinica/examenes-laboratorio")) {
+            if (HttpMethod.POST.equals(method)) return "Examen de laboratorio guardado correctamente";
+            if (HttpMethod.PUT.equals(method)) return "Examen de laboratorio actualizado correctamente";
+        }
+
         if (path.startsWith("/api/genericos")) {
             if (HttpMethod.POST.equals(method)) return "Generico guardado correctamente";
             if (HttpMethod.PUT.equals(method)) return "Generico actualizado correctamente";

@@ -22,8 +22,15 @@ public class LaboratorioOrden {
     @JoinColumn(name = "id_atencion", nullable = false)
     private AtencionMedica atencion;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "id_examen")
+    private ExamenLaboratorio examenCatalogo;
+
     @Column(nullable = false)
     private String examen;
+
+    @Column(precision = 10, scale = 2)
+    private java.math.BigDecimal precioExamen;
 
     @Column(nullable = false)
     @Builder.Default

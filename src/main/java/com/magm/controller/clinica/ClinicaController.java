@@ -16,6 +16,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,6 +31,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -44,6 +48,7 @@ public class ClinicaController {
     private final TriajeRepository triajeRepository;
     private final AtencionMedicaRepository atencionMedicaRepository;
     private final DiagnosticoAtencionRepository diagnosticoAtencionRepository;
+    private final ExamenLaboratorioRepository examenLaboratorioRepository;
     private final RecetaRepository recetaRepository;
     private final RecetaDetalleRepository recetaDetalleRepository;
     private final LaboratorioOrdenRepository laboratorioOrdenRepository;
@@ -53,6 +58,17 @@ public class ClinicaController {
     private final ProductoRepository productoRepository;
     private final UsuarioRepository usuarioRepository;
     private final VentaService ventaService;
+
+        private static final Set<String> AREAS_LABORATORIO_VALIDAS = Set.of(
+            "HEMATOLOGIA",
+            "BIOQUIMICA",
+            "INMUNOLOGIA",
+            "MICROBIOLOGIA",
+            "PARASITOLOGIA",
+            "HORMONAS",
+            "UROANALISIS",
+            "OTROS"
+        );
 
     @GetMapping("/pacientes")
     public ResponseEntity<List<Paciente>> listarPacientes(@RequestParam(required = false) String q) {
@@ -279,6 +295,114 @@ public class ClinicaController {
         return ResponseEntity.ok(atencionMedicaRepository.findAllByOrderByFechaAtencionDesc());
     }
 
+        @GetMapping("/atenciones/{idAtencion}/resumen")
+        public ResponseEntity<Map<String, Object>> resumenAtencion(@PathVariable Integer idAtencion) {
+        AtencionMedica atencion = atencionMedicaRepository.findById(idAtencion)
+            .orElseThrow(() -> new RuntimeException("Atencion no encontrada"));
+
+        Triaje triaje = triajeRepository.findByAdmisionIdAdmisionOrderByFechaRegistroDesc(atencion.getAdmision().getIdAdmision())
+            .stream()
+            .findFirst()
+            .orElse(null);
+
+        List<LaboratorioOrden> ordenesLaboratorio = laboratorioOrdenRepository.findByAtencionIdAtencionOrderByFechaOrdenDesc(idAtencion);
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("atencion", atencion);
+        payload.put("triaje", triaje);
+        payload.put("ordenesLaboratorio", ordenesLaboratorio);
+        return ResponseEntity.ok(payload);
+        }
+
+        @GetMapping("/examenes-laboratorio")
+        public ResponseEntity<Map<String, Object>> listarExamenesLaboratorio(
+            @RequestParam(required = false) Boolean activo,
+            @RequestParam(required = false) String area,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+        ) {
+        String areaNormalizada = normalizarArea(area);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
+        Page<ExamenLaboratorio> data = examenLaboratorioRepository.buscar(activo, areaNormalizada, limpiarTexto(q), pageable);
+
+        return ResponseEntity.ok(Map.of(
+            "content", data.getContent(),
+            "page", data.getNumber(),
+            "size", data.getSize(),
+            "totalElements", data.getTotalElements(),
+            "totalPages", data.getTotalPages(),
+            "first", data.isFirst(),
+            "last", data.isLast()
+        ));
+        }
+
+        @GetMapping("/examenes-laboratorio/{idExamen}")
+        public ResponseEntity<ExamenLaboratorio> obtenerExamenLaboratorio(@PathVariable Integer idExamen) {
+        ExamenLaboratorio examen = examenLaboratorioRepository.findById(idExamen)
+            .orElseThrow(() -> new RuntimeException("Examen de laboratorio no encontrado"));
+        return ResponseEntity.ok(examen);
+        }
+
+        @PostMapping("/examenes-laboratorio")
+        public ResponseEntity<ExamenLaboratorio> crearExamenLaboratorio(@RequestBody ExamenLaboratorioRequest request) {
+        validarExamenLaboratorioRequest(request, null);
+
+        ExamenLaboratorio examen = ExamenLaboratorio.builder()
+            .codigo(request.getCodigo().trim())
+            .nombre(request.getNombre().trim())
+            .descripcion(limpiarTexto(request.getDescripcion()))
+            .areaLaboratorio(normalizarArea(request.getAreaLaboratorio()))
+            .precio(request.getPrecio())
+            .tiempoEntrega(request.getTiempoEntrega().trim())
+            .requiereAyuno(request.getRequiereAyuno() != null && request.getRequiereAyuno())
+            .requiereMuestraEspecial(request.getRequiereMuestraEspecial() != null && request.getRequiereMuestraEspecial())
+            .indicacionesPaciente(limpiarTexto(request.getIndicacionesPaciente()))
+            .activo(request.getActivo() == null || request.getActivo())
+            .build();
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(examenLaboratorioRepository.save(examen));
+        }
+
+        @PutMapping("/examenes-laboratorio/{idExamen}")
+        public ResponseEntity<ExamenLaboratorio> actualizarExamenLaboratorio(@PathVariable Integer idExamen,
+                                          @RequestBody ExamenLaboratorioRequest request) {
+        ExamenLaboratorio examen = examenLaboratorioRepository.findById(idExamen)
+            .orElseThrow(() -> new RuntimeException("Examen de laboratorio no encontrado"));
+
+        validarExamenLaboratorioRequest(request, idExamen);
+
+        examen.setCodigo(request.getCodigo().trim());
+        examen.setNombre(request.getNombre().trim());
+        examen.setDescripcion(limpiarTexto(request.getDescripcion()));
+        examen.setAreaLaboratorio(normalizarArea(request.getAreaLaboratorio()));
+        examen.setPrecio(request.getPrecio());
+        examen.setTiempoEntrega(request.getTiempoEntrega().trim());
+        examen.setRequiereAyuno(request.getRequiereAyuno() != null && request.getRequiereAyuno());
+        examen.setRequiereMuestraEspecial(request.getRequiereMuestraEspecial() != null && request.getRequiereMuestraEspecial());
+        examen.setIndicacionesPaciente(limpiarTexto(request.getIndicacionesPaciente()));
+        examen.setActivo(request.getActivo() == null || request.getActivo());
+
+        return ResponseEntity.ok(examenLaboratorioRepository.save(examen));
+        }
+
+        @PutMapping("/examenes-laboratorio/{idExamen}/activar")
+        public ResponseEntity<ExamenLaboratorio> activarExamenLaboratorio(@PathVariable Integer idExamen) {
+        ExamenLaboratorio examen = examenLaboratorioRepository.findById(idExamen)
+            .orElseThrow(() -> new RuntimeException("Examen de laboratorio no encontrado"));
+        examen.setActivo(true);
+        return ResponseEntity.ok(examenLaboratorioRepository.save(examen));
+        }
+
+        @PutMapping("/examenes-laboratorio/{idExamen}/inactivar")
+        public ResponseEntity<ExamenLaboratorio> inactivarExamenLaboratorio(@PathVariable Integer idExamen) {
+        ExamenLaboratorio examen = examenLaboratorioRepository.findById(idExamen)
+            .orElseThrow(() -> new RuntimeException("Examen de laboratorio no encontrado"));
+            // Si fue utilizado en ordenes, solo se permite inactivar (no existe eliminacion fisica en este modulo).
+        examen.setActivo(false);
+        return ResponseEntity.ok(examenLaboratorioRepository.save(examen));
+        }
+
     @PostMapping("/atenciones/{idAtencion}/diagnosticos")
     public ResponseEntity<DiagnosticoAtencion> registrarDiagnostico(@PathVariable Integer idAtencion,
                                                                     @RequestBody DiagnosticoRequest request) {
@@ -476,11 +600,31 @@ public class ClinicaController {
         AtencionMedica atencion = atencionMedicaRepository.findById(idAtencion)
                 .orElseThrow(() -> new RuntimeException("Atencion no encontrada"));
 
+        ExamenLaboratorio examenCatalogo = null;
+        String examenTexto = request.getExamen();
+        BigDecimal precioExamen = null;
+
+        if (request.getIdExamen() != null) {
+            examenCatalogo = examenLaboratorioRepository.findById(request.getIdExamen())
+                .orElseThrow(() -> new RuntimeException("Examen de laboratorio no encontrado"));
+            if (!Boolean.TRUE.equals(examenCatalogo.getActivo())) {
+            throw new RuntimeException("El examen de laboratorio seleccionado esta inactivo");
+            }
+            examenTexto = examenCatalogo.getNombre();
+            precioExamen = examenCatalogo.getPrecio();
+        }
+
+        if (examenTexto == null || examenTexto.isBlank()) {
+            throw new RuntimeException("Debe indicar el examen o seleccionar uno del catalogo");
+        }
+
         LaboratorioOrden orden = LaboratorioOrden.builder()
                 .atencion(atencion)
-                .examen(request.getExamen())
+            .examenCatalogo(examenCatalogo)
+            .examen(examenTexto.trim())
+            .precioExamen(precioExamen)
                 .estado("PENDIENTE")
-                .observaciones(request.getObservaciones())
+            .observaciones(limpiarTexto(request.getObservaciones()))
                 .build();
 
         LaboratorioOrden guardada = laboratorioOrdenRepository.save(orden);
@@ -675,6 +819,58 @@ public class ClinicaController {
         historiaClinicaEventoRepository.save(evento);
     }
 
+    private void validarExamenLaboratorioRequest(ExamenLaboratorioRequest request, Integer idExamenActual) {
+        if (request == null) {
+            throw new RuntimeException("Datos de examen de laboratorio requeridos");
+        }
+        if (request.getCodigo() == null || request.getCodigo().isBlank()) {
+            throw new RuntimeException("El codigo del examen es obligatorio");
+        }
+        if (request.getNombre() == null || request.getNombre().isBlank()) {
+            throw new RuntimeException("El nombre del examen es obligatorio");
+        }
+        if (request.getAreaLaboratorio() == null || request.getAreaLaboratorio().isBlank()) {
+            throw new RuntimeException("El area de laboratorio es obligatoria");
+        }
+        if (request.getTiempoEntrega() == null || request.getTiempoEntrega().isBlank()) {
+            throw new RuntimeException("El tiempo estimado de entrega es obligatorio");
+        }
+        if (request.getPrecio() == null || request.getPrecio().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("El precio debe ser mayor a cero");
+        }
+
+        Optional<ExamenLaboratorio> existenteCodigo = examenLaboratorioRepository.findByCodigoIgnoreCase(request.getCodigo().trim());
+        if (existenteCodigo.isPresent() && !existenteCodigo.get().getIdExamen().equals(idExamenActual)) {
+            throw new RuntimeException("El codigo del examen ya existe");
+        }
+
+        Optional<ExamenLaboratorio> existenteNombre = examenLaboratorioRepository.findByNombreIgnoreCase(request.getNombre().trim());
+        if (existenteNombre.isPresent() && !existenteNombre.get().getIdExamen().equals(idExamenActual)) {
+            throw new RuntimeException("El nombre del examen ya existe");
+        }
+
+        normalizarArea(request.getAreaLaboratorio());
+    }
+
+    private String normalizarArea(String area) {
+        if (area == null || area.isBlank()) {
+            return null;
+        }
+        String normalizada = area.trim().toUpperCase();
+        if (!AREAS_LABORATORIO_VALIDAS.contains(normalizada)) {
+            throw new RuntimeException("Area de laboratorio invalida");
+        }
+        return normalizada;
+    }
+
+    private String limpiarTexto(String valor) {
+        if (valor == null) {
+            return null;
+        }
+        String limpio = valor.trim();
+        return limpio.isEmpty() ? null : limpio;
+    }
+
     @Data
     public static class MedicoRequest {
         @NotNull
@@ -779,9 +975,28 @@ public class ClinicaController {
 
     @Data
     public static class LaboratorioOrdenRequest {
-        @NotNull
         private String examen;
+        private Integer idExamen;
         private String observaciones;
+    }
+
+    @Data
+    public static class ExamenLaboratorioRequest {
+        @NotNull
+        private String codigo;
+        @NotNull
+        private String nombre;
+        private String descripcion;
+        @NotNull
+        private String areaLaboratorio;
+        @NotNull
+        private BigDecimal precio;
+        @NotNull
+        private String tiempoEntrega;
+        private Boolean requiereAyuno;
+        private Boolean requiereMuestraEspecial;
+        private String indicacionesPaciente;
+        private Boolean activo;
     }
 
     @Data

@@ -7,7 +7,10 @@ import com.magm.entity.Proveedor;
 import com.magm.entity.Rol;
 import com.magm.entity.Usuario;
 import com.magm.entity.Zona;
+import com.magm.entity.clinica.ExamenLaboratorio;
 import com.magm.entity.clinica.Especialidad;
+import com.magm.entity.clinica.Medico;
+import com.magm.entity.clinica.Paciente;
 import com.magm.repository.ClienteRepository;
 import com.magm.repository.LaboratorioRepository;
 import com.magm.repository.ProductoRepository;
@@ -15,7 +18,10 @@ import com.magm.repository.ProveedorRepository;
 import com.magm.repository.RolRepository;
 import com.magm.repository.UsuarioRepository;
 import com.magm.repository.ZonaRepository;
+import com.magm.repository.clinica.ExamenLaboratorioRepository;
 import com.magm.repository.clinica.EspecialidadRepository;
+import com.magm.repository.clinica.MedicoRepository;
+import com.magm.repository.clinica.PacienteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +30,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.HashSet;
 import java.util.List;
 
 @Configuration
@@ -70,6 +78,9 @@ public class DataInitializer {
     private final ProveedorRepository proveedorRepository;
     private final RolRepository rolRepository;
     private final EspecialidadRepository especialidadRepository;
+        private final MedicoRepository medicoRepository;
+        private final PacienteRepository pacienteRepository;
+        private final ExamenLaboratorioRepository examenLaboratorioRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Bean
@@ -130,6 +141,7 @@ public class DataInitializer {
             ));
 
             asegurarEspecialidadesBase();
+            asegurarSemillasClinica();
 
             Zona zonaPrincipal = asegurarZonaPrincipal();
             asegurarUsuarioPrivilegiado("superadmin", "superadmin123", "Super Administrador", zonaPrincipal, rolAdmin);
@@ -240,6 +252,62 @@ public class DataInitializer {
                     .activa(true)
                     .build());
         }
+    }
+
+    private void asegurarSemillasClinica() {
+        Especialidad medicinaGeneral = especialidadRepository.findByActivaTrueOrderByNombreAsc().stream()
+                .findFirst()
+                .orElseGet(() -> especialidadRepository.save(Especialidad.builder()
+                        .nombre("Medicina General")
+                        .descripcion("Especialidad medica: Medicina General")
+                        .activa(true)
+                        .build()));
+
+        Medico medico = medicoRepository.findByCmp("CMP12345").orElseGet(() -> Medico.builder()
+                .nombres("Juan")
+                .apellidos("Perez")
+                .cmp("CMP12345")
+                .telefono("999111222")
+                .email("juan.perez@policlinico.local")
+                .consultorio("Consultorio 1")
+                .horarioInicio(LocalTime.of(8, 0))
+                .horarioFin(LocalTime.of(14, 0))
+                .activo(true)
+                .especialidades(new HashSet<>())
+                .build());
+        medico.getEspecialidades().add(medicinaGeneral);
+        medicoRepository.save(medico);
+
+        pacienteRepository.findByDni("44556677").orElseGet(() -> pacienteRepository.save(Paciente.builder()
+                .nombres("Maria")
+                .apellidos("Lopez")
+                .dni("44556677")
+                .telefono("988777666")
+                .direccion("Av. Principal 123")
+                .fechaNacimiento(LocalDate.of(1995, 5, 10))
+                .sexo("F")
+                .alergias("Ninguna")
+                .antecedentes("Sin antecedentes relevantes")
+                .contactoEmergenciaNombre("Carlos Lopez")
+                .contactoEmergenciaTelefono("977666555")
+                .estado(1)
+                .build()));
+
+        ExamenLaboratorio examen = examenLaboratorioRepository.findByCodigoIgnoreCase("LAB-GLU-001")
+                .orElseGet(() -> ExamenLaboratorio.builder()
+                        .codigo("LAB-GLU-001")
+                        .nombre("Glucosa en sangre")
+                        .descripcion("Medicion de glucosa en ayunas")
+                        .areaLaboratorio("BIOQUIMICA")
+                        .precio(new BigDecimal("18.00"))
+                        .tiempoEntrega("24 horas")
+                        .requiereAyuno(true)
+                        .requiereMuestraEspecial(false)
+                        .indicacionesPaciente("Ayuno de 8 horas")
+                        .activo(true)
+                        .build());
+        examen.setActivo(true);
+        examenLaboratorioRepository.save(examen);
     }
 
     private Zona asegurarZonaPrincipal() {

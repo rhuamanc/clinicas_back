@@ -8,4 +8,6 @@ import java.util.List;
 public interface LaboratorioOrdenRepository extends JpaRepository<LaboratorioOrden, Integer> {
     List<LaboratorioOrden> findByEstadoOrderByFechaOrdenDesc(String estado);
     List<LaboratorioOrden> findByAtencionAdmisionPacienteIdPacienteOrderByFechaOrdenDesc(Integer idPaciente);
+    List<LaboratorioOrden> findByAtencionIdAtencionOrderByFechaOrdenDesc(Integer idAtencion);
+    boolean existsByExamenCatalogoIdExamen(Integer idExamen);
 }
